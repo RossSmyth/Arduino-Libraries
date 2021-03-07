@@ -1,0 +1,12 @@
+Events and coroutines:
+
+Every coroutine will return an event.
+Events are actually integers the corrsepond to a compile-time array of function pointers
+They can return themselves
+They will return INT_MAX once per lifetime, which signifies their state has been reset and the coroutine is "finished"
+Coroutine state is stored in static variables in the function and global variables
+The event loop is seperate from the "real" program loop, but is called each loop if the queue has items
+Interrupt routines can add events to the event queue
+There shall be an array of function pointers
+The length of the array = number of events for the program
+Event ID = index in array
