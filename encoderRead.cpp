@@ -5,6 +5,7 @@
 
 // There are put here under the assumption that an AVR board is used
 // because there are only two external interrupts on them. So only one encoder can be used.
+// I'm not sure how to have these not be globals as the interrupt must have them in scope.
 static volatile int  encoderCount;
 static int*          userEncoderChannel2;
 
@@ -38,11 +39,15 @@ struct ENCODER* setupEncoder(int userChannel1, int userChannel2, float userAngPP
   userEncoder->anglePerPulse = userAngPP;
 
   // Ensure the memory is 0 for total angle
-  userEncoder->angle = 0;
+  userEncoder->angle    = 0;
+  userEncoder->velocity = 0; // initilize to zero but may not be.
+
+  // Set the initial value for calcuating velocity
+  userEncoder->_lastRead = micros();
   
   // Attach interrupt. Only look at rising edges of one channel for direction detection
   attachInterrupt(digitalPinToInterrupt(userEncoder->encoderChannel1), Chan1Rise, RISING);
-
+  
   // Set pointer to be used in the interrupt
   userEncoderChannel2 = &userEncoder->encoderChannel2;
   
@@ -51,23 +56,32 @@ struct ENCODER* setupEncoder(int userChannel1, int userChannel2, float userAngPP
 
 // Resets the encoder accumulater and the pulse counter to zero.
 void resetEncoder( struct ENCODER* userEncoder ) {
-  userEncoder->angle = 0;
 
   // Turn interrupts off to be safe.
   noInterrupts();
   encoderCount = 0;
   // Turn interrupts back on
   interrupts();
+
+  // Init the angle and the time for the velocity
+  userEncoder->angle = 0;
+  userEncoder->_lastRead = micros();
 }
 
 // Updates angle variable since last reading
 void readEncoder( struct ENCODER* userEncoder ) {
+  float oldAngle = userEncoder->angle; // Previous angle for calculating velocity
+  
   // Turn interrupts off to be safe.
   noInterrupts();
   
   // Increment angle based upon encoder counts
   userEncoder->angle += encoderCount * userEncoder->anglePerPulse;
 
+  // Calculate velocity based upon previous angle and time difference.
+  userEncoder->velocity = (userEncoder->angle - oldAngle) / (micros()/1000000.0f - userEncoder->_lastRead/1000000.0f);
+  userEncoder->_lastRead = micros(); // Set the last read to the current time.
+  
   // Reset encoder counts
   encoderCount = 0;
   
